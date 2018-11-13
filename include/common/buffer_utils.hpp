@@ -1,5 +1,5 @@
-#ifndef __BUFFER_UTILS_H__
-#define __BUFFER_UTILS_H__
+#ifndef __BUFFER_UTILS_HPP__
+#define __BUFFER_UTILS_HPP__
 
 
 const int max_packet_size = 65536;
