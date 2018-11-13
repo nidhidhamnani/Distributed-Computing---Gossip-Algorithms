@@ -2,14 +2,16 @@
 #include <iostream>
 #include "push/push.hpp"
 #include "common/DS.hpp"
-#include "common/parse_input.hpp"
+#include "common/common.hpp"
+#include "common/log.hpp"
 using namespace std;
 
 int main(int argc, char const *argv[]) {
-    printf("I am push\n");
+
+    int base_port = atoi(argv[1]);
 
     file_input fi;
-    parse_file("inp.txt", &fi, 8000);
+    parse_file("inp.txt", &fi, base_port);
 
     cout << fi.N << " " << fi.base_port << endl;
 
@@ -18,8 +20,11 @@ int main(int argc, char const *argv[]) {
             cout << v << " ";
         }
         cout << endl;
-    }    
+    }
 
+    auto ts = current_ts(); // get this when you want to record the time.
+
+    LOG_INFO(ts, {"msg","Success"});
 
     return 0;
 }

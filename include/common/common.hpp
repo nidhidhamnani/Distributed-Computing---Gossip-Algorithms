@@ -1,9 +1,14 @@
-#ifndef __PARSE_INPUT_HPP_
-#define __PARSE_INPUT_HPP_
+#ifndef __COMMON_HPP__
+#define __COMMON_HPP__
 
 #include <string>
 #include <fstream>
+#include <chrono>
 #include "DS.hpp"
+
+long current_ts() {
+    return std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now().time_since_epoch()).count();
+}
 
 void parse_file(std::string filename, file_input *inp, int base_port) {
     std::ifstream file;
