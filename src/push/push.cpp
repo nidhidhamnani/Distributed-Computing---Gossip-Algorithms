@@ -14,7 +14,7 @@ std::uniform_real_distribution<double> distribution(1, 100);
 std::mt19937 engine(rd()); // Mersenne twister MT19937
 
 bool drop_packet() {
-    return (distribution(engine) < 50);
+    return (distribution(engine) < 90);
 }
 
 // microseconds
@@ -27,7 +27,8 @@ void GossipPush::Start() {
         LOG_INFO(current_ts(), {"pid", std::to_string(PROCESS_ID), "msg", "Starting gossip routine"});
         while(!rest_all_terminated() || !i_am_done.load()) {
             usleep(gossip_repeat_interval); // make this random
-            gossip();
+            if(!rest_all_terminated() || !i_am_done.load())
+                gossip();
         }
         LOG_INFO(current_ts(), {"pid", std::to_string(PROCESS_ID), "msg", "Ending gossip routine"});
     });
@@ -55,6 +56,7 @@ void GossipPush::Wait() {
 void GossipPush::init() {
     i_am_done.store(false);
     end.store(false);
+    sent_terminate = false;
     outgoing_neighbours = file_inp.graph[PROCESS_ID];
     send_buf = malloc(net::max_packet_size);
     recv_buf = malloc(net::max_packet_size);
@@ -121,7 +123,8 @@ void GossipPush::process_message(int size) {
         case GOSSIP: {
             add_gossip(p.gsp_data.id, p.gsp_data.data);
             gossips_received[p.gsp_data.id] = true;
-            if(received_all_gossip() && i_am_done.load()) {
+            if(received_all_gossip() && i_am_done.load() && !sent_terminate) {
+                sent_terminate = true;
                 LOG_INFO_GREEN(ts, {"pid", std::to_string(PROCESS_ID), "msg", "Received all gossip"});
                 send_terminate_to_all();
             }

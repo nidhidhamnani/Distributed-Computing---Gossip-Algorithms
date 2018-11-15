@@ -46,6 +46,7 @@ private:
 
     // true if no more new messages from my side.
     std::atomic_bool i_am_done;
+    bool sent_terminate;
 
     void *send_buf, *recv_buf;
 
