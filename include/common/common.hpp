@@ -4,20 +4,25 @@
 #include <string>
 #include <fstream>
 #include <chrono>
-#include "DS.hpp"
+
+struct file_input {
+    int N;
+    std::vector<std::vector<int>> graph;
+
+    int num_gossip_msg;
+};
 
 long current_ts() {
     return std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now().time_since_epoch()).count();
 }
 
-void parse_file(std::string filename, file_input *inp, int base_port) {
+void parse_file(std::string filename, file_input *inp) {
     std::ifstream file;
     file.open(filename.c_str());
 
     int N;
     file >> N;
     inp->N = N;
-    inp->base_port = base_port;
     int size, val;
     inp->graph.resize(N);
     for(int i=0; i<N; i++) {
