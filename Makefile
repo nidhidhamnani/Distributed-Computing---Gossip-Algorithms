@@ -1,6 +1,6 @@
 all: push pull
 
-N=4
+N=10
 
 push:
 	mpic++ src/push/*.cpp -lpthread -std=c++14 -o push.out -I ./include

@@ -14,6 +14,7 @@
 #include <utility>
 #include <algorithm>
 #include <atomic>
+#define KMAG  "\x1B[35m"
 
 using namespace std;
 
@@ -36,6 +37,13 @@ enum PACKET_TYPE : char {
 };
 
 
+std::random_device rd;
+std::uniform_real_distribution<double> distribution(1, 100);
+std::mt19937 engine(rd()); // Mersenne twister MT19937
+
+bool drop_packet() {
+    return (distribution(engine) < 50);
+}
 
 
 // Message
@@ -145,7 +153,7 @@ void process_packet(packet p) {
     for (it = p.msg.begin(); it!=p.msg.end(); it++) {
         my_msgs.insert(*it);
     }
-    printf("Process %d, set len = %d\n", NODEID, my_msgs.size());
+    printf("%sProcess %d, set len = %d\n", KMAG, NODEID, my_msgs.size());
     if (my_msgs.size() == fi.N) {
         received_all_messages = true;
     }
@@ -159,6 +167,12 @@ void recv_messages() {
     MPI_Recv(recvbuf, MAX_SIZE, MPI_BYTE, MPI_ANY_SOURCE, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
     p.decode_msg(recvbuf);
     // printf("Process %d received message %d from %d\n", NODEID, p.type, p.sender_id);
+
+    auto ts = current_ts();
+    if(drop_packet() && p.type != TERMINATE) {
+        LOG_WARNING(current_ts(), {"pid", std::to_string(NODEID), "msg", "Packet dropped"});
+        return;
+    }
 
     switch(p.type) {
 
@@ -217,6 +231,7 @@ void start_gossip(){
         for(int i=0;i<K;i++) {
             int rand_num = int(rand()%num_neigh);
             buffer_lock.lock();
+            // usleep(gossip_repeat_interval);
             send_message(my_neigh[rand_num], ENQUIRE);
             buffer_lock.unlock();
         }
@@ -232,7 +247,7 @@ void start_gossip(){
 int main(int argc, char const *argv[]) {
 
     srand(time(0)); 
-	// Getting process id.
+    // Getting process id.
     MPI_Init(NULL, NULL);
     int process_id;
     MPI_Comm_rank(MPI_COMM_WORLD, &process_id);
@@ -256,10 +271,16 @@ int main(int argc, char const *argv[]) {
 
 
     thread recv_thd([](){
-        while(!all_processes_ended()) {
+        while(true) {
             recv_messages();
         }
     });
+
+    // thread recv_thd([](){
+    //     while(!all_processes_ended()) {
+    //         recv_messages();
+    //     }
+    // });
 
     start_gossip();
     
