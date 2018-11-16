@@ -13,3 +13,6 @@ run_push:
 
 run_pull:
 	mpirun -n $(N) pull.out inp.txt
+
+gen_input:
+	python scripts/gen_input.py $(N) > inp.txt

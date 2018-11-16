@@ -104,7 +104,6 @@ struct packet {
 
 // Function to send terminate message after ending
 void send_terminate() {
-
     packet p;
     p.type = TERMINATE;
     p.sender_id = NODEID;
@@ -241,7 +240,9 @@ void start_gossip(){
 
     printf("Process %d SEND TERMINATED! at %ld\n", NODEID, timestamp);
     fflush(stdout);
+    buffer_lock.lock();
     send_terminate();
+    buffer_lock.unlock();
 }
 
 int main(int argc, char const *argv[]) {
@@ -270,17 +271,17 @@ int main(int argc, char const *argv[]) {
     terminated_processes.resize(fi.N, false);
 
 
-    thread recv_thd([](){
-        while(true) {
-            recv_messages();
-        }
-    });
-
     // thread recv_thd([](){
-    //     while(!all_processes_ended()) {
+    //     while(true) {
     //         recv_messages();
     //     }
     // });
+
+    thread recv_thd([](){
+        while(!all_processes_ended()) {
+            recv_messages();
+        }
+    });
 
     start_gossip();
     
