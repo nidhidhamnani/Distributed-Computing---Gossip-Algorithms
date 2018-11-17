@@ -33,8 +33,7 @@ void send_terminate() {
     for(int i=0; i<fi.N; i++) {
         if(i == NODEID) 
             continue;
-        MPI_Send(sendbuf, size, MPI_BYTE, i, 0, MPI_COMM_WORLD);
-        
+        net::send_msg(i, sendbuf, size);
     }
     terminated_processes[NODEID] = true;
 }
@@ -61,8 +60,7 @@ void send_message(int receiver, PACKET_TYPE type) {
     }
     int size = p.encode_msg(sendbuf);
     total_messages_sent++;
-    MPI_Send(sendbuf, size, MPI_BYTE, receiver, 0, MPI_COMM_WORLD);
-
+    net::send_msg(receiver, sendbuf, size);
 }
 
 void process_packet(packet p) {
@@ -80,7 +78,11 @@ void process_packet(packet p) {
 void recv_messages() {
 
     packet p;
-    MPI_Recv(recvbuf, MAX_SIZE, MPI_BYTE, MPI_ANY_SOURCE, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+    int size = net::recv_msg(recvbuf);
+    if(size <= 0) {
+        LOG_WARNING(current_ts(), {"pid", std::to_string(NODEID), "msg", "Receive failed"});
+        return;
+    }
     p.decode_msg(recvbuf);
 
     auto ts = current_ts();
@@ -139,8 +141,12 @@ void start_gossip(){
     }
 
     while (!received_all_messages.load()) {
-        for(int i=0;i<K;i++) {
-            int rand_num = int(rand()%num_neigh);
+        set<int> random_K;
+        while(random_K.size() < K) {
+            int rand_num = int_distribution(engine);
+            random_K.emplace(rand_num);
+        }
+        for(int rand_num: random_K) {
             buffer_lock.lock();
             send_message(my_neigh[rand_num], ENQUIRE);
             buffer_lock.unlock();
@@ -159,8 +165,7 @@ void start_gossip(){
 
 
 void init() {
-
-    srand(time(0));
+    int_distribution = std::uniform_int_distribution<int>(0, fi.graph[NODEID].size()-1);
     K = 2;
     total_messages_sent = 0;
     total_messages_received = 0;

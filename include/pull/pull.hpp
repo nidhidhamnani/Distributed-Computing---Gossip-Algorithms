@@ -17,8 +17,11 @@ mutex buffer_lock;
 atomic_bool received_all_messages;
 std::vector<bool> terminated_processes;
 atomic_int total_messages_sent, total_messages_received;
+
 std::random_device rd;
-std::uniform_real_distribution<double> distribution(1, 100);
 std::mt19937 engine(rd()); // Mersenne twister MT19937
+
+std::uniform_real_distribution<double> distribution(1, 100);
+std::uniform_int_distribution<int> int_distribution;
 
 #endif
