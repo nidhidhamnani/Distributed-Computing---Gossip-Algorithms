@@ -14,7 +14,7 @@ std::uniform_real_distribution<double> distribution(1, 100);
 std::mt19937 engine(rd()); // Mersenne twister MT19937
 
 bool drop_packet() {
-    return (distribution(engine) < 90);
+    return (distribution(engine) < 50);
 }
 
 // microseconds
@@ -57,6 +57,7 @@ void GossipPush::init() {
     i_am_done.store(false);
     end.store(false);
     sent_terminate = false;
+    total_messages_sent.store(0);
     outgoing_neighbours = file_inp.graph[PROCESS_ID];
     send_buf = malloc(net::max_packet_size);
     recv_buf = malloc(net::max_packet_size);
@@ -79,6 +80,7 @@ void GossipPush::gossip() {
         size = pkt.marshal(send_buf);
         for(auto neigh: outgoing_neighbours) {
             LOG_INFO_CYAN(current_ts(), {"pid", std::to_string(PROCESS_ID), "msg", "Sending gossip", "to", std::to_string(neigh), "data", std::to_string(g.data)});
+            total_messages_sent++;
             net::send_msg(neigh, send_buf, size);
         }
     }
@@ -194,7 +196,7 @@ int main(int argc, char const *argv[]) {
 
     gp.Wait();
 
-    LOG_INFO_GREEN(current_ts(), {"pid", std::to_string(process_id), "msg","Success"});
+    LOG_INFO_GREEN(current_ts(), {"pid", std::to_string(process_id), "msg","Success", "total_messages_sent", std::to_string(gp.TotalMessages())});
 
     MPI_Finalize();
     return 0;

@@ -35,12 +35,17 @@ public:
     // Wait till all the gossip stuff is over.
     void Wait();
 
+    int TotalMessages() {
+        return total_messages_sent.load();
+    }
+
 private:
     file_input file_inp;
 
     int PROCESS_ID;
     std::vector<int> outgoing_neighbours;
     std::atomic_bool end;
+    std::atomic_int total_messages_sent;
 
     std::mutex send_lock;
 
