@@ -35,17 +35,23 @@ public:
     // Wait till all the gossip stuff is over.
     void Wait();
 
+    int TotalMessages() {
+        return total_messages_sent.load();
+    }
+
 private:
     file_input file_inp;
 
-    int PROCESS_ID;
+    int PROCESS_ID, K;
     std::vector<int> outgoing_neighbours;
     std::atomic_bool end;
+    std::atomic_int total_messages_sent;
 
     std::mutex send_lock;
 
     // true if no more new messages from my side.
     std::atomic_bool i_am_done;
+    bool sent_terminate;
 
     void *send_buf, *recv_buf;
 
