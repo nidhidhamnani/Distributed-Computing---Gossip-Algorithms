@@ -42,7 +42,7 @@ public:
 private:
     file_input file_inp;
 
-    int PROCESS_ID;
+    int PROCESS_ID, K;
     std::vector<int> outgoing_neighbours;
     std::atomic_bool end;
     std::atomic_int total_messages_sent;

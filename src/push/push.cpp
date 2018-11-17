@@ -1,5 +1,6 @@
 #include <thread>
 #include <string>
+#include <set>
 #include <unistd.h>
 #include <random>
 
@@ -12,6 +13,7 @@
 std::random_device rd;
 std::uniform_real_distribution<double> distribution(1, 100);
 std::mt19937 engine(rd()); // Mersenne twister MT19937
+std::uniform_int_distribution<int> int_distribution;
 
 bool drop_packet() {
     return (distribution(engine) < 50);
@@ -57,12 +59,14 @@ void GossipPush::init() {
     i_am_done.store(false);
     end.store(false);
     sent_terminate = false;
+    K = 2;
     total_messages_sent.store(0);
     outgoing_neighbours = file_inp.graph[PROCESS_ID];
     send_buf = malloc(net::max_packet_size);
     recv_buf = malloc(net::max_packet_size);
     gossips_received.resize(file_inp.N);
     ended.resize(file_inp.N);
+    int_distribution = std::uniform_int_distribution<int>(0, outgoing_neighbours.size()-1);
     for(int i=0; i<file_inp.N; i++) {
         gossips_received[i] = false;
         ended[i] = false;
@@ -75,13 +79,18 @@ void GossipPush::gossip() {
 
     packet pkt(GOSSIP, PROCESS_ID);
     int size;
+    std::set<int> random_K;
+    while(random_K.size() < K) {
+        int rand_num = int_distribution(engine);
+        random_K.emplace(rand_num);
+    }
     for(auto g: all_gossips) {
         pkt.gsp_data = g;
         size = pkt.marshal(send_buf);
-        for(auto neigh: outgoing_neighbours) {
+        for(auto neigh: random_K) {
             LOG_INFO_CYAN(current_ts(), {"pid", std::to_string(PROCESS_ID), "msg", "Sending gossip", "to", std::to_string(neigh), "data", std::to_string(g.data)});
             total_messages_sent++;
-            net::send_msg(neigh, send_buf, size);
+            net::send_msg(outgoing_neighbours[neigh], send_buf, size);
         }
     }
 
