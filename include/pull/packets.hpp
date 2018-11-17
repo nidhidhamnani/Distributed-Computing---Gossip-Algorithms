@@ -54,7 +54,7 @@ struct packet {
                 ptr = write_int(ptr, pr.first);
                 ptr = write_int(ptr, pr.second);
             }   
-            total_size += (1 + 2 * set_size) * sizeof(int);
+            total_size += (1 + (2 * set_size)) * sizeof(int);
         }
         return total_size;
     }
@@ -66,6 +66,7 @@ struct packet {
         sender_id = read_int(&ptr);
         if (type == GOSSIP || type == ENQUIRE) {
             int set_size = read_int(&ptr);
+            msg.clear();
             for(int i=0;i<set_size;i++) {
                 pairs pr;
                 pr.first = read_int(&ptr);

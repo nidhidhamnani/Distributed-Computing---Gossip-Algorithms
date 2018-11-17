@@ -2,6 +2,7 @@
 #define __PUSH_PACKETS_HPP__
 
 #include <string>
+#include <vector>
 #include "common/buffer_utils.hpp"
 
 enum PACKET_TYPE : char {
@@ -14,6 +15,8 @@ struct gossip_data {
 
     gossip_data() {}
     gossip_data(int id, int data): id(id), data(data) {}
+
+    const static int marshall_size = 2 * sizeof(int);
 
     // Encode the packet into storable bytes.
     int marshal(void *original) {
@@ -37,7 +40,7 @@ struct packet {
     int from; // the sender of the packet.
 
     // Used only for gossip.
-    gossip_data gsp_data;
+    std::vector<gossip_data> gsp_data;
 
     packet() {}
 
@@ -62,7 +65,12 @@ struct packet {
         int size = sizeof(char) + sizeof(int);
 
         if(type == GOSSIP) {
-            size += gsp_data.marshal(ptr);
+            ptr = write_int(ptr, gsp_data.size());
+            size += sizeof(int);
+            for(auto g: gsp_data) {
+                size += g.marshal(ptr);
+                increment(&ptr, gossip_data::marshall_size);
+            }
         }
 
         return size;
@@ -75,7 +83,12 @@ struct packet {
         from = read_int(&ptr);
 
         if(type == GOSSIP) {
-            gsp_data.unmarshal(ptr);
+            int size = read_int(&ptr);
+            gsp_data.resize(size);
+            for(int i=0; i<size; i++) {
+                gsp_data[i].unmarshal(ptr);
+                increment(&ptr, gossip_data::marshall_size);
+            }
         }
     }
 };

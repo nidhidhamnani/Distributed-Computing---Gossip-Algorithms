@@ -71,7 +71,6 @@ private:
     void recv_event();
     void process_message(int size);
 
-    std::vector<bool> gossips_received;
     bool received_all_gossip();
 
     std::vector<bool> ended;

@@ -2,10 +2,11 @@ import random
 import sys
 
 n = int(sys.argv[1])
+num_msgs_per_node = 2
 
 num_neighbours = n/2
 
-print n
+print n, num_msgs_per_node
 
 a = range(n)
 

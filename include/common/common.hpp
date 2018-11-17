@@ -6,7 +6,7 @@
 #include <chrono>
 
 struct file_input {
-    int N;
+    int N, M;
     std::vector<std::vector<int>> graph;
 
     int num_gossip_msg;
@@ -20,9 +20,10 @@ void parse_file(std::string filename, file_input *inp) {
     std::ifstream file;
     file.open(filename.c_str());
 
-    int N;
-    file >> N;
+    int N, M;
+    file >> N >> M;
     inp->N = N;
+    inp->M = M;
     int size, val;
     inp->graph.resize(N);
     for(int i=0; i<N; i++) {

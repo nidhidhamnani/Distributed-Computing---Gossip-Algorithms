@@ -64,14 +64,14 @@ void send_message(int receiver, PACKET_TYPE type) {
 }
 
 void process_packet(packet p) {
-
+    int before = my_msgs.size();
     set<pairs> :: iterator it;
     for (it = p.msg.begin(); it!=p.msg.end(); it++) {
         my_msgs.insert(*it);
     }
-    LOG_INFO(current_ts(), {"pid", std::to_string(NODEID), "msg", "Adding gossip message", "from pid", std::to_string(p.sender_id)});
-    if (my_msgs.size() == fi.N) {
-        received_all_messages = true;
+    int after = my_msgs.size();
+    if(after > before) {
+        LOG_INFO(current_ts(), {"pid", std::to_string(NODEID), "msg", "Added new gossip message", "from", std::to_string(p.sender_id)});
     }
 }
 
@@ -103,6 +103,7 @@ void recv_messages() {
 
             if (result.size()>0) {
                 buffer_lock.lock();
+                LOG_INFO_CYAN(current_ts(), {"pid", std::to_string(NODEID), "msg", "Sending gossip", "to", std::to_string(p.sender_id)});
                 send_message(p.sender_id, GOSSIP);
                 buffer_lock.unlock();
             }
@@ -123,16 +124,29 @@ void recv_messages() {
 
 }
 
+bool received_all_messages() {
+    buffer_lock.lock();
+    int size = my_msgs.size();
+    buffer_lock.unlock();
+    return size == (fi.N*fi.M);
+}
+
 void start_gossip(){
 
     LOG_INFO(current_ts(), {"pid", std::to_string(NODEID), "msg", "Starting gossip routine"});
 
-    pairs pr;
-    pr.first = NODEID;
-    pr.second = NODEID;
-    buffer_lock.lock();
-    my_msgs.insert(pr);
-    buffer_lock.unlock();
+
+    thread insert_thread([](){
+        for(int i=0; i<fi.M; i++) {
+            pairs pr;
+            pr.first = (NODEID*fi.M)+i;
+            pr.second = NODEID;
+            buffer_lock.lock();
+            my_msgs.insert(pr);
+            buffer_lock.unlock();
+            sleep(2);
+        }
+    });
 
     vector<int> my_neigh;
     int num_neigh = fi.graph[NODEID].size();
@@ -140,7 +154,7 @@ void start_gossip(){
         my_neigh.push_back(fi.graph[NODEID][i]);
     }
 
-    while (!received_all_messages.load()) {
+    while (!received_all_messages()) {
         set<int> random_K;
         while(random_K.size() < K) {
             int rand_num = int_distribution(engine);
@@ -153,6 +167,7 @@ void start_gossip(){
         }
         usleep(gossip_repeat_interval);
     }
+    insert_thread.join();
 
     LOG_INFO_GREEN(current_ts(), {"pid", std::to_string(NODEID), "msg", "Received all gossip"});
     fflush(stdout);
@@ -169,7 +184,6 @@ void init() {
     K = 2;
     total_messages_sent = 0;
     total_messages_received = 0;
-    received_all_messages = false;
     sendbuf = malloc(65536);
     recvbuf = malloc(65536);
     terminated_processes.resize(fi.N, false);
@@ -188,7 +202,6 @@ int main(int argc, char const *argv[]) {
 
     LOG_INFO(current_ts(), {"pid", std::to_string(process_id), "msg", "Waiting to sync"});
 
-    sleep(2);
     LOG_INFO(current_ts(), {"pid", std::to_string(process_id), "msg", "Starting process"});
 
     // Initialisation
@@ -197,20 +210,16 @@ int main(int argc, char const *argv[]) {
     
     LOG_INFO(current_ts(), {"pid", std::to_string(NODEID), "msg", "Starting receive routine"});
     thread recv_thd([](){
-        while(!all_processes_ended()) {
+        while(!all_processes_ended() || !received_all_messages()) {
             recv_messages();
         }
     });
     LOG_INFO(current_ts(), {"pid", std::to_string(NODEID), "msg", "Ending receive routine"});
     start_gossip();
-    sleep(2);
     recv_thd.join();
 
-    LOG_INFO_GREEN(current_ts(), {"pid", std::to_string(process_id), "msg","Success"});
-
-    printf("pid %d: total messages sent = %d, total messages received = %d\n", 
-        NODEID, total_messages_sent.load(), total_messages_received.load()); 
-    fflush(stdout);
+    LOG_INFO_GREEN(current_ts(), {"pid", std::to_string(process_id), "msg","Success", "total_messages_sent", to_string(total_messages_sent.load()), 
+            "total_messages_received", to_string(total_messages_received.load()) });
 
     MPI_Finalize();
 

@@ -44,8 +44,8 @@ void GossipPush::Start() {
     });
 }
 
-void GossipPush::Gossip(int data) {
-    add_gossip(PROCESS_ID, data);
+void GossipPush::Gossip(int id) {
+    add_gossip(id, PROCESS_ID);
 }
 
 void GossipPush::Wait() {
@@ -64,34 +64,28 @@ void GossipPush::init() {
     outgoing_neighbours = file_inp.graph[PROCESS_ID];
     send_buf = malloc(net::max_packet_size);
     recv_buf = malloc(net::max_packet_size);
-    gossips_received.resize(file_inp.N);
     ended.resize(file_inp.N);
     int_distribution = std::uniform_int_distribution<int>(0, outgoing_neighbours.size()-1);
     for(int i=0; i<file_inp.N; i++) {
-        gossips_received[i] = false;
         ended[i] = false;
     }
-    gossips_received[PROCESS_ID] = true;
 }
 
 void GossipPush::gossip() {
     send_lock.lock();
 
     packet pkt(GOSSIP, PROCESS_ID);
-    int size;
     std::set<int> random_K;
     while(random_K.size() < K) {
         int rand_num = int_distribution(engine);
         random_K.emplace(rand_num);
     }
-    for(auto g: all_gossips) {
-        pkt.gsp_data = g;
-        size = pkt.marshal(send_buf);
-        for(auto neigh: random_K) {
-            LOG_INFO_CYAN(current_ts(), {"pid", std::to_string(PROCESS_ID), "msg", "Sending gossip", "to", std::to_string(neigh), "data", std::to_string(g.data)});
-            total_messages_sent++;
-            net::send_msg(outgoing_neighbours[neigh], send_buf, size);
-        }
+    pkt.gsp_data = all_gossips;
+    int size = pkt.marshal(send_buf);
+    for(auto neigh: random_K) {
+        LOG_INFO_CYAN(current_ts(), {"pid", std::to_string(PROCESS_ID), "msg", "Sending gossip", "to", std::to_string(neigh)});
+        total_messages_sent++;
+        net::send_msg(outgoing_neighbours[neigh], send_buf, size);
     }
 
     send_lock.unlock();
@@ -132,8 +126,9 @@ void GossipPush::process_message(int size) {
     LOG_INFO_MAG(current_ts(), {"pid", std::to_string(PROCESS_ID), "msg", "Received packet", "type", p.type_string(), "from", std::to_string(p.from)});
     switch(p.type) {
         case GOSSIP: {
-            add_gossip(p.gsp_data.id, p.gsp_data.data);
-            gossips_received[p.gsp_data.id] = true;
+            for(auto g: p.gsp_data) {
+                add_gossip(g.id, g.data);
+            }
             if(received_all_gossip() && i_am_done.load() && !sent_terminate) {
                 sent_terminate = true;
                 LOG_INFO_GREEN(ts, {"pid", std::to_string(PROCESS_ID), "msg", "Received all gossip"});
@@ -149,10 +144,10 @@ void GossipPush::process_message(int size) {
 }
 
 bool GossipPush::received_all_gossip() {
-    for(auto b: gossips_received) {
-        if(!b) return false;
-    }
-    return true;
+    send_lock.lock();
+    int size = all_gossips.size();
+    send_lock.unlock();
+    return size == (file_inp.N*file_inp.M);
 }
 
 bool GossipPush::rest_all_terminated() {
@@ -198,9 +193,13 @@ int main(int argc, char const *argv[]) {
 
     gp.Start();
 
-    usleep(process_id * 150000);
+    // usleep(process_id * 150000);
 
-    gp.Gossip(process_id);
+    for(int i=0; i<fi.M; i++) {
+        gp.Gossip((process_id*fi.M)+i);
+        sleep(2);
+    }
+
     gp.IAmDone();
 
     gp.Wait();
