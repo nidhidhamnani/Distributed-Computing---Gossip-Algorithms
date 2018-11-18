@@ -19,10 +19,9 @@ const int max_packet_size = 65536;
 
 MPI_Request request; 
 
+// Sends a message asynchronously.
 bool send_msg(int to, void *data, int data_len) {
-
     MPI_Isend(data, data_len, MPI_BYTE, to, 0, MPI_COMM_WORLD, &request);
-
     return true;
 }
 

@@ -6,10 +6,9 @@
 #include <chrono>
 
 struct file_input {
-    int N, M;
+    int N, // No. of processes. 
+        M; // No. of messages to gossip.
     std::vector<std::vector<int>> graph;
-
-    int num_gossip_msg;
 };
 
 long current_ts() {

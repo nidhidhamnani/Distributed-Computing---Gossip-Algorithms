@@ -14,6 +14,8 @@
 #define KCYN  "\x1B[36m"
 #define KWHT  "\x1B[37m"
 
+// Function to log conviniently.
+
 std::string log(std::initializer_list<std::string> a_args) {
     std::string s = "";
     bool even = false;

@@ -1,9 +1,6 @@
 #ifndef __BUFFER_UTILS_HPP__
 #define __BUFFER_UTILS_HPP__
 
-
-const int max_packet_size = 65536;
-
 // Functions to read and write int and char to void* buffer.
 
 void increment(void **ptr, int offset) {

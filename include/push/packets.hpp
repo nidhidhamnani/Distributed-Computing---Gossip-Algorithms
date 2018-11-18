@@ -9,6 +9,7 @@ enum PACKET_TYPE : char {
     GOSSIP = 0, TERMINATE = 1
 };
 
+// structure of a gossip message.
 struct gossip_data {
     int id;
     int data;

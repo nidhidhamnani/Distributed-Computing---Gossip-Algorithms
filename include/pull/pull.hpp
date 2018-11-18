@@ -9,7 +9,6 @@
 
 int NODEID, K;
 void *sendbuf, *recvbuf;
-int MAX_SIZE = 65536;
 std::set<pairs> my_msgs;
 file_input fi;
 int gossip_repeat_interval = 1000000;

@@ -10,12 +10,14 @@
 #include "common/common.hpp"
 #include "common/log.hpp"
 
+// Random number generators.
 std::random_device rd;
 std::uniform_real_distribution<double> distribution(1, 100);
 std::mt19937 engine(rd()); // Mersenne twister MT19937
 std::uniform_int_distribution<int> int_distribution;
 
 double prob, percent_K;
+// Toss a coin based on probablity.
 bool drop_packet() {
     return (distribution(engine) < prob);
 }
@@ -26,16 +28,18 @@ const int gossip_repeat_interval = 1000000;
 // Public functions
 
 void GossipPush::Start() {
+    // Create thread for gossip.
     gossip_thread = std::thread([this](){
         LOG_INFO(current_ts(), {"pid", std::to_string(PROCESS_ID), "msg", "Starting gossip routine"});
         while(!rest_all_terminated() || !i_am_done.load()) {
-            usleep(gossip_repeat_interval); // make this random
+            usleep(gossip_repeat_interval);
             if(!rest_all_terminated() || !i_am_done.load())
                 gossip();
         }
         LOG_INFO(current_ts(), {"pid", std::to_string(PROCESS_ID), "msg", "Ending gossip routine"});
     });
     
+    // Create thread for receiving.
     recv_thread = std::thread([this](){
         LOG_INFO(current_ts(), {"pid", std::to_string(PROCESS_ID), "msg", "Starting receive routine"});
         while(!rest_all_terminated() || !received_all_gossip()) {
@@ -59,7 +63,6 @@ void GossipPush::Wait() {
 void GossipPush::init() {
     ended_count = 0;
     i_am_done.store(false);
-    end.store(false);
     sent_terminate = false;
     K = int(float(file_inp.N * percent_K) / 100.0);
     if(K==0) K = 2;
@@ -73,12 +76,15 @@ void GossipPush::init() {
 void GossipPush::gossip() {
     send_lock.lock();
 
+    // Pick K random neighbours.
     packet pkt(GOSSIP, PROCESS_ID);
     std::set<int> random_K;
     while(random_K.size() < K) {
         int rand_num = int_distribution(engine);
         random_K.emplace(rand_num);
     }
+
+    // Send gossip to those K neighbours.
     pkt.gsp_data = all_gossips;
     int size = pkt.marshal(send_buf);
     for(auto neigh: random_K) {
@@ -92,6 +98,7 @@ void GossipPush::gossip() {
 
 void GossipPush::add_gossip(int id, int data) {
     send_lock.lock();
+    // Check for uniqueness.
     for(auto g: all_gossips) {
         if(g.id == id) {
             send_lock.unlock();
@@ -119,15 +126,18 @@ void GossipPush::process_message(int size) {
     p.unmarshal(data);
     auto ts = current_ts();
     if(drop_packet() && p.type != TERMINATE) {
+        // Simulating a loss in packet.
         LOG_WARNING(current_ts(), {"pid", std::to_string(PROCESS_ID), "msg", "Packet dropped"});
         return;
     }
     LOG_INFO_MAG(current_ts(), {"pid", std::to_string(PROCESS_ID), "msg", "Received packet", "type", p.type_string(), "from", std::to_string(p.from)});
     switch(p.type) {
         case GOSSIP: {
+            // Add all messages into my set.
             for(auto g: p.gsp_data) {
                 add_gossip(g.id, g.data);
             }
+            // Check for termination.
             if(received_all_gossip() && i_am_done.load() && !sent_terminate) {
                 sent_terminate = true;
                 LOG_INFO_GREEN(ts, {"pid", std::to_string(PROCESS_ID), "msg", "Received all gossip"});
@@ -157,9 +167,9 @@ void GossipPush::send_terminate_to_all() {
     packet p(TERMINATE, PROCESS_ID);
     send_lock.lock();
     int size = p.marshal(send_buf);
-    ended_count++;
+    ended_count++; // I ended.
     for(int i=0; i<file_inp.N; i++) {
-        if(i == PROCESS_ID) continue;
+        if(i == PROCESS_ID) continue; // Don't send TERMINATE to myself.
         net::send_msg(i, send_buf, size);
     }
     send_lock.unlock();
@@ -178,8 +188,7 @@ int main(int argc, char const *argv[]) {
     percent_K = atoi(argv[3]);
 
     LOG_INFO(current_ts(), {"pid", std::to_string(process_id), "msg", "Waiting to sync"});
-
-    sleep(2);
+    sleep(2); // Sleeping to ensure all processess are up.
     LOG_INFO_GREEN(current_ts(), {"pid", std::to_string(process_id), "msg", "Starting process"});
 
     file_input fi;
@@ -187,17 +196,21 @@ int main(int argc, char const *argv[]) {
 
     GossipPush gp(process_id, fi);
 
-    gp.Start();
+    gp.Start(); // Start the gossip servers.
 
+    // Sleeping to ensure that all processess are ready to receive messages.
     usleep(2000000);
 
+    // Add fi.M number of messages into gossip with some interval.
     for(int i=0; i<fi.M; i++) {
         gp.Gossip((process_id*fi.M)+i);
         sleep(2);
     }
 
+    // I don't want to send more.
     gp.IAmDone();
 
+    // Wait for all processess to terminate.
     gp.Wait();
 
     LOG_INFO_GREEN(current_ts(), {"pid", std::to_string(process_id), "msg","Success", "total_messages_sent", std::to_string(gp.TotalMessages())});
