@@ -11,7 +11,7 @@ using namespace std;
 typedef pair<int, int> pairs;
 
 enum PACKET_TYPE : char {
-    ENQUIRE = 0, 
+    ENQUIRE = 0,
     GOSSIP = 1,
     TERMINATE = 2
 };
