@@ -20,6 +20,8 @@ using namespace std;
 
 
 double prob, percent_K;
+
+// Packet drop probability
 bool drop_packet() {
     return (distribution(engine) < prob);
 }
@@ -50,12 +52,15 @@ bool all_processes_ended() {
     return true;
 }
 
+
+// Function to send messages
 void send_message(int receiver, PACKET_TYPE type) {
 
     packet p;
     p.type = type;
     p.sender_id = NODEID;
 
+    // Updating set of messages to be sent for gossip or enquire
     if(type == GOSSIP || type == ENQUIRE) {
         p.msg = my_msgs;
     }
@@ -64,9 +69,12 @@ void send_message(int receiver, PACKET_TYPE type) {
     net::send_msg(receiver, sendbuf, size);
 }
 
+
+// Function to process the gossip messages received
 void process_packet(packet p) {
     int before = my_msgs.size();
     set<pairs> :: iterator it;
+    // Adding the messages to the set of all received messages
     for (it = p.msg.begin(); it!=p.msg.end(); it++) {
         my_msgs.insert(*it);
     }
@@ -76,6 +84,7 @@ void process_packet(packet p) {
     }
 }
 
+// Function to receive messages
 void recv_messages() {
 
     packet p;
@@ -87,6 +96,7 @@ void recv_messages() {
     p.decode_msg(recvbuf);
 
     auto ts = current_ts();
+    // Dropping packets using drop threshold
     if(drop_packet() && p.type != TERMINATE) {
         LOG_WARNING(current_ts(), {"pid", std::to_string(NODEID), "msg", "Packet dropped"});
         return;
@@ -96,12 +106,14 @@ void recv_messages() {
 
     switch(p.type) {
 
+        // ENQUIRE message received
         case ENQUIRE: {
             total_messages_received++;
             std::set<pairs> result;
+            // Checking the diff in all messages of the sender and NODEID 
             std::set_difference(my_msgs.begin(), my_msgs.end(), p.msg.begin(), p.msg.end(),
                 std::inserter(result, result.end()));
-
+            // If NODEID has extra messages then send all the messages
             if (result.size()>0) {
                 buffer_lock.lock();
                 LOG_INFO_CYAN(current_ts(), {"pid", std::to_string(NODEID), "msg", "Sending gossip", "to", std::to_string(p.sender_id)});
@@ -110,6 +122,7 @@ void recv_messages() {
             }
             break;
         }
+        // GOSSIP message received
         case GOSSIP: {
             total_messages_received++;
             buffer_lock.lock();
@@ -117,6 +130,7 @@ void recv_messages() {
             buffer_lock.unlock();
             break;
         }
+        // TERMINATE message received
         case TERMINATE: {
             terminated_processes[p.sender_id]=true;
             break;
@@ -125,6 +139,7 @@ void recv_messages() {
 
 }
 
+// Function to check if all the messages are received from all the neighbours
 bool received_all_messages() {
     buffer_lock.lock();
     int size = my_msgs.size();
@@ -132,11 +147,12 @@ bool received_all_messages() {
     return size == (fi.N*fi.M);
 }
 
+// Function to start gossiping 
 void start_gossip(){
 
     LOG_INFO(current_ts(), {"pid", std::to_string(NODEID), "msg", "Starting gossip routine"});
 
-
+    // Initialising the set of messages
     thread insert_thread([](){
         for(int i=0; i<fi.M; i++) {
             pairs pr;
@@ -154,7 +170,9 @@ void start_gossip(){
     for(int i=0;i<num_neigh;i++) {
         my_neigh.push_back(fi.graph[NODEID][i]);
     }
-
+    // Sending ENQUIRE messages to K random neighbour
+    // till all the messages from all the neighbours are
+    // received
     while (!received_all_messages()) {
         set<int> random_K;
         while(random_K.size() < K) {
@@ -172,6 +190,7 @@ void start_gossip(){
 
     LOG_INFO_GREEN(current_ts(), {"pid", std::to_string(NODEID), "msg", "Received all gossip"});
     fflush(stdout);
+    // Sendng TERMINATE message to all the other processes
     buffer_lock.lock();
     send_terminate();
     buffer_lock.unlock();
@@ -179,7 +198,7 @@ void start_gossip(){
     LOG_INFO(current_ts(), {"pid", std::to_string(NODEID), "msg", "Ending gossip routine"});
 }
 
-
+// Function to initialise global variable
 void init() {
     int_distribution = std::uniform_int_distribution<int>(0, fi.graph[NODEID].size()-1);
     K = int(float(fi.N * percent_K) / 100.0);
@@ -194,7 +213,6 @@ void init() {
 
 int main(int argc, char const *argv[]) {
 
- 
     MPI_Init(NULL, NULL);
     int process_id;
     MPI_Comm_rank(MPI_COMM_WORLD, &process_id);
@@ -208,11 +226,11 @@ int main(int argc, char const *argv[]) {
 
     LOG_INFO(current_ts(), {"pid", std::to_string(process_id), "msg", "Starting process"});
 
-    // Initialisation
-    parse_file(filename, &fi);
+    parse_file(filename, &fi); // Reading input graph
     init();
     
     LOG_INFO(current_ts(), {"pid", std::to_string(NODEID), "msg", "Starting receive routine"});
+    // Receive messages till all messages are received and other processes have terminated
     thread recv_thd([](){
         while(!all_processes_ended() || !received_all_messages()) {
             recv_messages();
