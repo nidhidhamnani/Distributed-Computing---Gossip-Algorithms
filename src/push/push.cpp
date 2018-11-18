@@ -15,8 +15,9 @@ std::uniform_real_distribution<double> distribution(1, 100);
 std::mt19937 engine(rd()); // Mersenne twister MT19937
 std::uniform_int_distribution<int> int_distribution;
 
+double prob, percent_K;
 bool drop_packet() {
-    return (distribution(engine) < 50);
+    return (distribution(engine) < prob);
 }
 
 // microseconds
@@ -56,19 +57,17 @@ void GossipPush::Wait() {
 // Private functions
 
 void GossipPush::init() {
+    ended_count = 0;
     i_am_done.store(false);
     end.store(false);
     sent_terminate = false;
-    K = 2;
+    K = int(float(file_inp.N * percent_K) / 100.0);
+    if(K==0) K = 2;
     total_messages_sent.store(0);
     outgoing_neighbours = file_inp.graph[PROCESS_ID];
     send_buf = malloc(net::max_packet_size);
     recv_buf = malloc(net::max_packet_size);
-    ended.resize(file_inp.N);
     int_distribution = std::uniform_int_distribution<int>(0, outgoing_neighbours.size()-1);
-    for(int i=0; i<file_inp.N; i++) {
-        ended[i] = false;
-    }
 }
 
 void GossipPush::gossip() {
@@ -137,7 +136,7 @@ void GossipPush::process_message(int size) {
             break;
         }
         case TERMINATE: {
-            ended[p.from] = true;
+            ended_count++;
             break;
         }
     }
@@ -151,19 +150,14 @@ bool GossipPush::received_all_gossip() {
 }
 
 bool GossipPush::rest_all_terminated() {
-    for(int i=0; i<file_inp.N; i++) {
-        if(i == PROCESS_ID) continue;
-        if(!ended[i]) {
-            return false;
-        }
-    }
-    return true;
+    return ended_count.load() == (file_inp.N);
 }
 
 void GossipPush::send_terminate_to_all() {
     packet p(TERMINATE, PROCESS_ID);
     send_lock.lock();
     int size = p.marshal(send_buf);
+    ended_count++;
     for(int i=0; i<file_inp.N; i++) {
         if(i == PROCESS_ID) continue;
         net::send_msg(i, send_buf, size);
@@ -180,6 +174,8 @@ int main(int argc, char const *argv[]) {
     MPI_Comm_rank(MPI_COMM_WORLD, &process_id);
 
     auto filename = argv[1];
+    prob = atoi(argv[2]);
+    percent_K = atoi(argv[3]);
 
     LOG_INFO(current_ts(), {"pid", std::to_string(process_id), "msg", "Waiting to sync"});
 
@@ -193,7 +189,7 @@ int main(int argc, char const *argv[]) {
 
     gp.Start();
 
-    // usleep(process_id * 150000);
+    usleep(2000000);
 
     for(int i=0; i<fi.M; i++) {
         gp.Gossip((process_id*fi.M)+i);
@@ -205,6 +201,8 @@ int main(int argc, char const *argv[]) {
     gp.Wait();
 
     LOG_INFO_GREEN(current_ts(), {"pid", std::to_string(process_id), "msg","Success", "total_messages_sent", std::to_string(gp.TotalMessages())});
+
+    fprintf(stderr, "%d\n", gp.TotalMessages());
 
     MPI_Finalize();
     return 0;

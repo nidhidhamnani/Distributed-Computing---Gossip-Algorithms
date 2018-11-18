@@ -19,8 +19,9 @@
 using namespace std;
 
 
+double prob, percent_K;
 bool drop_packet() {
-    return (distribution(engine) < 50);
+    return (distribution(engine) < prob);
 }
 
 // Function to send terminate message after ending
@@ -181,7 +182,8 @@ void start_gossip(){
 
 void init() {
     int_distribution = std::uniform_int_distribution<int>(0, fi.graph[NODEID].size()-1);
-    K = 2;
+    K = int(float(fi.N * percent_K) / 100.0);
+    if(K==0) K = 2;
     total_messages_sent = 0;
     total_messages_received = 0;
     sendbuf = malloc(65536);
@@ -199,6 +201,8 @@ int main(int argc, char const *argv[]) {
 
     NODEID=process_id;
     auto filename = argv[1];
+    prob = atoi(argv[2]);
+    percent_K = atoi(argv[3]);
 
     LOG_INFO(current_ts(), {"pid", std::to_string(process_id), "msg", "Waiting to sync"});
 
@@ -220,6 +224,8 @@ int main(int argc, char const *argv[]) {
 
     LOG_INFO_GREEN(current_ts(), {"pid", std::to_string(process_id), "msg","Success", "total_messages_sent", to_string(total_messages_sent.load()), 
             "total_messages_received", to_string(total_messages_received.load()) });
+
+    fprintf(stderr, "%d\n", total_messages_sent.load());
 
     MPI_Finalize();
 

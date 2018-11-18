@@ -54,6 +54,7 @@ private:
     bool sent_terminate;
 
     void *send_buf, *recv_buf;
+    std::atomic_int ended_count;
 
     // Set all the local data.
     void init();
@@ -73,7 +74,6 @@ private:
 
     bool received_all_gossip();
 
-    std::vector<bool> ended;
     void send_terminate_to_all();
     bool rest_all_terminated();
 

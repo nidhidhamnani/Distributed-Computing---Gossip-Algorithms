@@ -2,8 +2,7 @@ import random
 import sys
 
 n = int(sys.argv[1])
-num_msgs_per_node = 2
-
+num_msgs_per_node = 5
 num_neighbours = n/2
 
 print n, num_msgs_per_node
