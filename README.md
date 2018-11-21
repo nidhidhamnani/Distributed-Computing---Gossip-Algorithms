@@ -22,7 +22,7 @@ $ make run_pull N=10 PK=40 P=20
 
 ## Benchmark
 
-Inputs are present for benchmarks.
+Inputs are present for benchmarks in `inputs` directory.
 
 ```
 # Run this for benchmark.
@@ -32,3 +32,10 @@ $ ./benchmark.sh
 ```
 
 Output will be in `bench_out` directory.
+
+Our benchmark results are in `bench_push` and `bench_pull` for push and pull respectively. To parse and get average values of our benchmark, run
+
+```
+$ g++ parse_bench_out.cpp -o parse.out
+$ ./parse.out
+```
